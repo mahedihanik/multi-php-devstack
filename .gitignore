@@ -1,0 +1,22 @@
+# Persistent MySQL data — NEVER commit (contains real databases)
+/data/
+
+# TLS private key + cert (regenerate locally with mkcert)
+/nginx/certs/
+
+# Local secrets & logs
+.env
+*.log
+*.err
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+
+# Projects live here but are their own repos / not part of this scaffolding.
+# Keep the folder + the sample 'info' project; ignore everything else.
+/www/*
+!/www/.gitkeep
+!/www/info/
+/www/info/.DS_Store

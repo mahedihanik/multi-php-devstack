@@ -1,0 +1,100 @@
+name: devstack
+
+# ----- shared bits for every PHP-FPM service -----
+x-php-common: &php-common
+  restart: unless-stopped
+  volumes:
+    - ./www:/var/www/html
+    - ./php/conf.d/zz-devstack.ini:/usr/local/etc/php/conf.d/zz-devstack.ini:ro
+  environment:
+    TZ: ${TZ}
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  networks:
+    - devstack
+
+services:
+  php72:
+    <<: *php-common
+    build: { context: ./php, args: { PHP_VERSION: "7.2" } }
+    image: devstack/php:7.2
+  php73:
+    <<: *php-common
+    build: { context: ./php, args: { PHP_VERSION: "7.3" } }
+    image: devstack/php:7.3
+  php74:
+    <<: *php-common
+    build: { context: ./php, args: { PHP_VERSION: "7.4" } }
+    image: devstack/php:7.4
+  php80:
+    <<: *php-common
+    build: { context: ./php, args: { PHP_VERSION: "8.0" } }
+    image: devstack/php:8.0
+  php81:
+    <<: *php-common
+    build: { context: ./php, args: { PHP_VERSION: "8.1" } }
+    image: devstack/php:8.1
+  php82:
+    <<: *php-common
+    build: { context: ./php, args: { PHP_VERSION: "8.2" } }
+    image: devstack/php:8.2
+  php84:
+    <<: *php-common
+    build: { context: ./php, args: { PHP_VERSION: "8.4" } }
+    image: devstack/php:8.4
+
+  nginx:
+    image: nginx:stable-alpine
+    restart: unless-stopped
+    depends_on: [php72, php73, php74, php80, php81, php82, php84]
+    volumes:
+      - ./www:/var/www/html
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    ports:
+      - "80:80"        # *.NN.test clean hostnames (http)
+      - "443:443"      # *.NN.test clean hostnames (https)
+      - "8072:8072"    # localhost:PORT fallback -> PHP 7.2
+      - "8073:8073"    # PHP 7.3
+      - "8074:8074"    # PHP 7.4
+      - "8080:8080"    # PHP 8.0
+      - "8081:8081"    # PHP 8.1
+      - "8082:8082"    # PHP 8.2
+      - "8084:8084"    # PHP 8.4
+    networks:
+      - devstack
+
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      TZ: ${TZ}
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./data/mysql:/var/lib/mysql
+    networks:
+      - devstack
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    restart: unless-stopped
+    depends_on: [mysql]
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      UPLOAD_LIMIT: 256M
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    ports:
+      - "8888:80"
+    networks:
+      - devstack
+
+networks:
+  devstack:
+    driver: bridge

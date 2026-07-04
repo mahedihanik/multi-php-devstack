@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# devstack helper — run from anywhere.
+set -euo pipefail
+STACK_DIR="$HOME/devstack"
+cd "$STACK_DIR"
+
+# normalize "8.2" or "82" -> service name "php82"
+svc() { local v="${1//./}"; echo "php${v}"; }
+
+usage() {
+  cat <<USAGE
+devstack — multi-PHP dev environment
+
+  stack up                       start everything
+  stack down                     stop everything
+  stack restart                  restart all containers
+  stack rebuild                  rebuild PHP images + restart
+  stack ps                       show container status
+  stack logs [service]           tail logs (e.g. stack logs nginx)
+
+  stack php <ver> <project> ...  run php in a project on that version
+                                 e.g. stack php 8.2 info -v
+  stack composer <ver> <proj> .. run composer for a project
+                                 e.g. stack composer 7.4 shop install
+  stack artisan <ver> <proj> ..  php artisan for a Laravel project
+  stack sh <ver>                 shell into a PHP container
+  stack mysql                    open a mysql client as root
+
+Versions: 7.2 7.3 7.4 8.0 8.1 8.2 8.4
+USAGE
+}
+
+cmd="${1:-help}"; shift || true
+case "$cmd" in
+  up)       docker compose up -d ;;
+  down)     docker compose down ;;
+  restart)  docker compose restart ;;
+  rebuild)  docker compose up -d --build ;;
+  ps)       docker compose ps ;;
+  logs)     docker compose logs -f "$@" ;;
+  php)      v="$1"; p="$2"; shift 2; docker compose exec -w "/var/www/html/$p" "$(svc "$v")" php "$@" ;;
+  composer) v="$1"; p="$2"; shift 2; docker compose exec -w "/var/www/html/$p" "$(svc "$v")" composer "$@" ;;
+  artisan)  v="$1"; p="$2"; shift 2; docker compose exec -w "/var/www/html/$p" "$(svc "$v")" php artisan "$@" ;;
+  sh)       v="$1"; docker compose exec "$(svc "$v")" bash ;;
+  mysql)    docker compose exec mysql sh -c 'exec mysql -uroot -p"$MYSQL_ROOT_PASSWORD"' ;;
+  help|-h|--help) usage ;;
+  *) echo "unknown command: $cmd"; echo; usage; exit 1 ;;
+esac
