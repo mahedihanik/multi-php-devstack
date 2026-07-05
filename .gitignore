@@ -14,6 +14,11 @@
 .idea/
 .vscode/
 
+# Your own project vhosts: name them *.local.conf to keep them out of git.
+# nginx still loads them (it includes *.conf). The php*.conf scaffolding and the
+# .example template stay tracked.
+/nginx/conf.d/*.local.conf
+
 # Projects live here but are their own repos / not part of this scaffolding.
 # Keep the folder + the sample 'info' project; ignore everything else.
 /www/*

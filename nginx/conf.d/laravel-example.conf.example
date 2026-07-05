@@ -1,28 +1,33 @@
-# wagebook (Laravel 9) on PHP 8.2
+# Example vhost for a Laravel / Symfony project (web root = /public).
+# Copy this to  <yourapp>.local.conf  and edit the three marked lines, then `stack restart`.
+#   cp laravel-example.conf.example myapp.local.conf
+#
+# Files ending in .example are ignored by nginx (it only loads *.conf).
+# The .local.conf naming keeps your project vhosts out of git (see .gitignore).
 
 # HTTP -> redirect to HTTPS
 server {
     listen 80;
-    server_name wagebook.82.test;
+    server_name myapp.82.test;                 # <-- your hostname
     return 301 https://$host$request_uri;
 }
 
 # HTTPS -> serve
 server {
     listen 443 ssl;
-    server_name wagebook.82.test;
+    server_name myapp.82.test;                 # <-- your hostname
 
     ssl_certificate     /etc/nginx/certs/devstack.pem;
     ssl_certificate_key /etc/nginx/certs/devstack-key.pem;
 
-    root /var/www/html/wagebook/public;
+    root /var/www/html/myapp/public;           # <-- your project's /public
     index index.php;
 
     location / { try_files $uri $uri/ /index.php?$query_string; }
     location ~ \.php$ {
         try_files $uri =404;
         fastcgi_split_path_info ^(.+\.php)(/.+)$;
-        fastcgi_pass php82:9000;
+        fastcgi_pass php82:9000;               # <-- php72 / php74 / php81 / php84 ...
         fastcgi_index index.php;
         include fastcgi_params;
         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;

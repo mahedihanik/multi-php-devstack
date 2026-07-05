@@ -1,102 +1,135 @@
-# devstack — multi-PHP dev environment
+# Devstack — Run 7 PHP versions at once on your Mac
 
-Runs PHP **7.2, 7.3, 7.4, 8.0, 8.1, 8.2, 8.4** simultaneously, sharing one
-nginx, one MySQL 8.0, and phpMyAdmin. Projects are plain folders in `www/` —
-nothing gets added to your project code.
+**PHP 7.2, 7.3, 7.4, 8.0, 8.1, 8.2, 8.4 — simultaneously.** One Docker stack with
+nginx, MySQL 8, phpMyAdmin, trusted local HTTPS, and clean `.test` domains. Your
+projects are just **folders** — no per-project Docker files, no config per app.
+Built and tested on **Apple Silicon (arm64)**.
 
-## Daily use
+![Shell](https://img.shields.io/badge/shell-bash-121011?logo=gnu-bash&logoColor=white)
+![Docker](https://img.shields.io/badge/docker-compose-2496ED?logo=docker&logoColor=white)
+![PHP](https://img.shields.io/badge/PHP-7.2--8.4-777BB4?logo=php&logoColor=white)
+![Platform](https://img.shields.io/badge/macOS-Apple%20Silicon-000000?logo=apple&logoColor=white)
+![License: MIT](https://img.shields.io/badge/license-MIT-green)
+![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)
+
+> Drop a project in `www/`, open `https://myapp.82.test` — done. Need to test the
+> same app on 7.4? Open `https://myapp.74.test`. Nothing to reconfigure.
+
+<!-- Add a demo GIF here — see "Record a demo" below. It's the single biggest
+     thing for adoption. -->
+<!-- ![demo](docs/demo.gif) -->
+
+---
+
+## Why this exists
+
+Switching PHP versions with Homebrew is painful, and EOL versions (7.2/7.3) barely
+compile on Apple Silicon. Existing tools each miss something for this use case:
+
+| | Devstack | Laravel Sail | Laradock | Valet | DDEV |
+|---|:---:|:---:|:---:|:---:|:---:|
+| Many PHP versions at the same time | Yes (7) | No (1/project) | Limited | 1 active | 1/project |
+| EOL 7.2/7.3 on Apple Silicon | Yes | No | Limited | No | Limited |
+| Project = plain folder (no per-project config) | Yes | No | No | Yes | No |
+| Trusted HTTPS + `.test` domains out of the box | Yes | No | Limited | Yes | Yes |
+| Shared MySQL + phpMyAdmin for everything | Yes | No | Yes | No | Limited |
+| One tiny helper CLI | Yes (`stack`) | Yes (`sail`) | No | Yes | Yes |
+
+**The niche it owns:** legacy-to-modern shops that maintain many apps pinned to
+different PHP versions and want them all running together, locally, on an M-series Mac.
+
+---
+
+## Quickstart
 
 ```bash
-stack up        # start everything
-stack ps        # see what's running
-stack down      # stop
+# prerequisites: Docker Desktop + Homebrew
+git clone https://github.com/mahedihanik/multi-php-devstack.git ~/devstack
+cd ~/devstack
+cp .env.example .env
+
+# build the images (first time; if a parallel build fails, build one at a time)
+docker compose build
+
+# start everything
+docker compose up -d
+
+# put the helper on your PATH
+ln -sf ~/devstack/bin/stack /opt/homebrew/bin/stack
 ```
 
-## Adding a project
+Open the bundled sample on any version:
 
-1. Put the code in `~/devstack/www/<name>/`  (e.g. `~/devstack/www/shop/`)
-2. Open it on whichever PHP version you want:
+- `http://localhost:8072/info/` for PHP 7.2 ... `http://localhost:8084/info/` for PHP 8.4
+- phpMyAdmin: `http://localhost:8888` (user `root` / `root`)
 
-| Access | PHP |
-|--------|-----|
-| http://shop.72.test  or  http://localhost:8072/shop/ | 7.2 |
-| http://shop.73.test  or  http://localhost:8073/shop/ | 7.3 |
-| http://shop.74.test  or  http://localhost:8074/shop/ | 7.4 |
-| http://shop.80.test  or  http://localhost:8080/shop/ | 8.0 |
-| http://shop.81.test  or  http://localhost:8081/shop/ | 8.1 |
-| http://shop.82.test  or  http://localhost:8082/shop/ | 8.2 |
-| http://shop.84.test  or  http://localhost:8084/shop/ | 8.4 |
+To get the pretty `https://<name>.NN.test` URLs, do the two one-time steps in
+[section 10 (dnsmasq)](DOCUMENTATION.md#10-clean-test-hostnames-dnsmasq) and
+[section 11 (mkcert)](DOCUMENTATION.md#11-trusted-https-mkcert).
 
-The `.test` hostnames need the dnsmasq step below (one-time). The
-`localhost:PORT` URLs work immediately with no DNS setup.
+---
 
-### Laravel / Symfony projects
-Their web root is `/public`. Edit the matching `nginx/conf.d/phpNN.conf`,
-change `root /var/www/html/$sitename;` to `root /var/www/html/$sitename/public;`
-then `stack restart`.
+## Access map
 
-## Composer / CLI per version
+| PHP | Pretty URL (HTTPS) | Zero-setup URL |
+|-----|--------------------|----------------|
+| 7.2 | `https://<proj>.72.test` | `http://localhost:8072/<proj>/` |
+| 7.3 | `https://<proj>.73.test` | `http://localhost:8073/<proj>/` |
+| 7.4 | `https://<proj>.74.test` | `http://localhost:8074/<proj>/` |
+| 8.0 | `https://<proj>.80.test` | `http://localhost:8080/<proj>/` |
+| 8.1 | `https://<proj>.81.test` | `http://localhost:8081/<proj>/` |
+| 8.2 | `https://<proj>.82.test` | `http://localhost:8082/<proj>/` |
+| 8.4 | `https://<proj>.84.test` | `http://localhost:8084/<proj>/` |
+
+---
+
+## The `stack` command
 
 ```bash
-stack composer 7.4 shop install      # composer inside PHP 7.4
-stack php 8.2 shop -v                 # php CLI at 8.2 in that project
-stack artisan 8.1 shop migrate        # laravel
-stack sh 8.0                          # shell into the 8.0 container
+stack up | down | restart | rebuild | ps | logs [service]
+stack php <ver> <project> ...        # e.g. stack php 8.2 myapp -v
+stack composer <ver> <project> ...   # e.g. stack composer 7.4 shop install
+stack artisan <ver> <project> ...    # e.g. stack artisan 8.2 myapp migrate
+stack sh <ver>                       # shell into a PHP container
+stack mysql                          # mysql client
 ```
 
-## Database
+---
 
-- Host from your Mac: `127.0.0.1:3306`
-- Host from inside a project (in PHP): `mysql:3306`
-- Root user/pass: `root` / `root`  (see `.env`)
-- Prewired db/user: `app` / `app` / `app`
-- phpMyAdmin: http://localhost:8888
-- CLI: `stack mysql`
+## Add a project
 
-## Sharing this MySQL with a separate dockerized project
+**Plain PHP:** drop it in `www/<name>/`, then open `https://<name>.82.test`.
 
-If you have another project with its own `docker-compose.yml` (e.g. a
-dockerized Laravel app), you can drop its own db container and use this one.
-
-**Option A — via host:** in the project's Laravel `.env`
-```
-DB_HOST=host.docker.internal
-DB_PORT=3306
-DB_DATABASE=mylaravel
-DB_USERNAME=app
-DB_PASSWORD=app
-```
-(add `extra_hosts: ["host.docker.internal:host-gateway"]` to its app service
-if the host isn't resolvable.)
-
-**Option B — join this network** (then `DB_HOST=mysql`):
-```yaml
-services:
-  app:
-    networks: [default, devstack]
-networks:
-  devstack:
-    external: true
-    name: devstack_devstack
-```
-
-Create the db first:
+**Laravel/Symfony** (web root is `/public`):
 ```bash
-stack mysql
-# then: CREATE DATABASE mylaravel; GRANT ALL ON mylaravel.* TO 'app'@'%'; FLUSH PRIVILEGES;
+cp nginx/conf.d/laravel-example.conf.example nginx/conf.d/myapp.local.conf
+# edit server_name + root + php version, then:
+stack restart
 ```
 
-Note: sharing means the project now depends on devstack being up. Switch
-`DB_HOST` back to its own db service to make it self-contained again.
+Full walkthrough (Composer, `.env`, DB, storage, gotchas): see
+**[DOCUMENTATION.md](DOCUMENTATION.md)**.
 
-## Clean `.test` hostnames (one-time, optional)
-See the dnsmasq section in the setup notes, or just use the `localhost:PORT`
-URLs which need no setup.
+---
 
-## Files
-- `docker-compose.yml` — all services
-- `php/Dockerfile` — one image built per version (composer + common extensions + xdebug)
-- `php/conf.d/zz-devstack.ini` — shared PHP settings (upload size, memory, xdebug off)
-- `nginx/conf.d/phpNN.conf` — one vhost per version
-- `www/` — your projects
-- `data/mysql/` — persistent database files
+## Record a demo (recommended)
+
+A short terminal GIF massively boosts adoption. Easiest options:
+```bash
+brew install vhs          # scripted, reproducible GIFs
+#   or
+brew install asciinema    # record a real session
+```
+Record `stack up`, hitting several versions, and phpMyAdmin; export to
+`docs/demo.gif`, and uncomment the image near the top of this README.
+
+---
+
+## Contributing
+
+Issues and PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Ideas: more PHP
+versions, Linux support, a `stack new` project scaffolder, optional Redis/Mailpit.
+
+## License
+
+[MIT](LICENSE) (c) Mahedi Hasan Anik

@@ -1,18 +1,18 @@
 # Devstack — Multi‑PHP Local Development Environment
 ### Complete step‑by‑step documentation
 
-**Machine:** Apple Silicon (arm64) Mac · **Built:** July 2026
+**Target:** Apple Silicon (arm64) Mac · **Stack:** Docker
 **Location:** `~/devstack`
 
-This document records, in order, everything that was set up: a Docker‑based
-environment running **7 PHP versions at once** (7.2 – 8.4) with a shared
-MySQL 8.0, phpMyAdmin, Node (via fnm), clean `.test` hostnames, trusted HTTPS,
-and a real Laravel project (`wagebook`) running on it.
+This document records, in order, how to set up a Docker‑based environment
+running **7 PHP versions at once** (7.2 – 8.4) with a shared MySQL 8.0,
+phpMyAdmin, Node (via fnm), clean `.test` hostnames, and trusted HTTPS — plus
+how to run a real Laravel project on it.
 
 ---
 
 ## Table of contents
-1. [What was already on the machine](#1-what-was-already-on-the-machine)
+1. [Prerequisites](#1-prerequisites)
 2. [Design decisions](#2-design-decisions)
 3. [Directory structure](#3-directory-structure)
 4. [The PHP images (7.2–8.4)](#4-the-php-images-7284)
@@ -24,21 +24,18 @@ and a real Laravel project (`wagebook`) running on it.
 10. [Clean `.test` hostnames (dnsmasq)](#10-clean-test-hostnames-dnsmasq)
 11. [Trusted HTTPS (mkcert)](#11-trusted-https-mkcert)
 12. [HTTP → HTTPS redirect](#12-http--https-redirect)
-13. [Running the wagebook Laravel project](#13-running-the-wagebook-laravel-project)
+13. [Example: running a Laravel project](#13-example-running-a-laravel-project)
 14. [Daily usage cheat sheet](#14-daily-usage-cheat-sheet)
 15. [Adding a new project](#15-adding-a-new-project)
 16. [Troubleshooting & gotchas](#16-troubleshooting--gotchas)
-17. [Outstanding manual steps](#17-outstanding-manual-steps)
+17. [Manual (sudo) steps](#17-manual-sudo-steps)
 
 ---
 
-## 1. What was already on the machine
-- **Homebrew** ✓
-- **Docker Desktop** ✓ (had to be *started* — the daemon wasn't running)
-- **No** PHP, MySQL, Composer, or Node yet (clean slate)
-
-Verified native `arm64` builds exist for all PHP images (7.2–8.4), so no
-emulation is needed.
+## 1. Prerequisites
+- **Homebrew**
+- **Docker Desktop** (must be running — start with `open -a Docker`)
+- Native `arm64` builds exist for all PHP images (7.2–8.4), so no emulation is needed.
 
 ---
 
@@ -60,17 +57,17 @@ folder; the PHP version is chosen by the URL you use.
 ```
 ~/devstack/
 ├── docker-compose.yml          # all services
-├── .env                        # MySQL creds + timezone
+├── .env                        # MySQL creds + timezone (gitignored)
 ├── php/
 │   ├── Dockerfile              # one image, reused per version via build arg
 │   └── conf.d/zz-devstack.ini  # shared PHP settings (upload size, xdebug off…)
 ├── nginx/
 │   ├── conf.d/                 # one vhost per version + per-project vhosts
-│   └── certs/                  # mkcert TLS cert + key
+│   │   └── laravel-example.conf.example   # copy this for a Laravel app
+│   └── certs/                  # mkcert TLS cert + key (gitignored)
 ├── www/                        # ← your projects live here
-│   ├── info/                   # sample project (phpinfo + DB check)
-│   └── wagebook/               # the Laravel app
-├── data/mysql/                 # persistent MySQL data (survives restarts)
+│   └── info/                   # sample project (phpinfo + DB check)
+├── data/mysql/                 # persistent MySQL data (gitignored)
 ├── bin/stack                   # helper CLI (symlinked to /opt/homebrew/bin/stack)
 ├── README.md
 └── DOCUMENTATION.md            # this file
@@ -98,7 +95,7 @@ Every version therefore includes: **Composer**, common extensions, and
 
 Versions built: **7.2, 7.3, 7.4, 8.0, 8.1, 8.2, 8.4** (no 8.3).
 
-> ⚠️ **Gotcha:** building all 7 in parallel exhausts memory and randomly fails
+> **Gotcha:** building all 7 in parallel exhausts memory and randomly fails
 > (`EOF` / killed). Fix: build failing versions **one at a time**
 > (`docker compose build php81`).
 
@@ -106,13 +103,13 @@ Versions built: **7.2, 7.3, 7.4, 8.0, 8.1, 8.2, 8.4** (no 8.3).
 
 ## 5. docker-compose stack
 
-Services (`~/devstack/docker-compose.yml`):
+Services (`docker-compose.yml`):
 - `php72 … php84` — 7 PHP‑FPM containers, each built from the shared Dockerfile
 - `nginx` — routes requests to the right PHP version
 - `mysql` — MySQL 8.0, data persisted to `./data/mysql`
 - `phpmyadmin` — web DB admin
 
-Credentials live in `~/devstack/.env`:
+Credentials live in `.env` (copy from `.env.example`):
 ```
 MYSQL_ROOT_PASSWORD=root
 MYSQL_DATABASE=app
@@ -159,14 +156,14 @@ cd ~/devstack && docker compose build
 docker compose up -d
 ```
 
-Verified: every version reports the correct `PHP x.y.z` and connects to
-`MySQL 8.0.46` (tested via the `info` sample project).
+Every version reports the correct `PHP x.y.z` and connects to `MySQL 8.0`
+(tested via the `info` sample project).
 
 ---
 
 ## 8. The `stack` helper command
 
-`~/devstack/bin/stack`, symlinked to `/opt/homebrew/bin/stack` (on PATH):
+`bin/stack`, symlinked to `/opt/homebrew/bin/stack` (on PATH):
 
 ```bash
 stack up                       # start everything
@@ -176,9 +173,9 @@ stack rebuild                  # rebuild PHP images + restart
 stack ps                       # status
 stack logs [service]           # tail logs
 
-stack php <ver> <project> ...      # run php in a project    e.g. stack php 8.2 wagebook -v
+stack php <ver> <project> ...      # run php in a project    e.g. stack php 8.2 myapp -v
 stack composer <ver> <project> ... # composer               e.g. stack composer 7.4 shop install
-stack artisan <ver> <project> ...  # laravel artisan        e.g. stack artisan 8.2 wagebook migrate
+stack artisan <ver> <project> ...  # laravel artisan        e.g. stack artisan 8.2 myapp migrate
 stack sh <ver>                     # shell into a PHP container
 stack mysql                        # mysql client as root
 ```
@@ -190,9 +187,9 @@ stack mysql                        # mysql client as root
 
 ```bash
 brew install fnm
-# added to ~/.zshrc:
+# add to ~/.zshrc:
 eval "$(fnm env --use-on-cd --version-file-strategy=recursive)"
-fnm install --lts        # installed Node v24 LTS
+fnm install --lts        # e.g. Node v24 LTS
 ```
 Node runs **on the host** (not in the PHP containers). `--use-on-cd` auto‑switches
 Node version when a project has a `.node-version`/`.nvmrc` file.
@@ -205,7 +202,7 @@ Makes every `*.test` domain resolve to `127.0.0.1` with no `/etc/hosts` edits.
 
 ```bash
 brew install dnsmasq
-# config written:
+# config:
 #   /opt/homebrew/etc/dnsmasq.d/devstack-test.conf  ->  address=/.test/127.0.0.1
 #   (conf-dir line added to /opt/homebrew/etc/dnsmasq.conf)
 ```
@@ -217,7 +214,7 @@ sudo mkdir -p /etc/resolver
 echo "nameserver 127.0.0.1" | sudo tee /etc/resolver/test
 sudo dscacheutil -flushcache && sudo killall -HUP mDNSResponder
 ```
-✅ Done and verified — `info.82.test` etc. resolve to `127.0.0.1`. Survives reboots.
+Verify: `info.82.test` etc. resolve to `127.0.0.1`. Survives reboots.
 
 ---
 
@@ -232,7 +229,7 @@ mkcert -cert-file devstack.pem -key-file devstack-key.pem \
   localhost 127.0.0.1
 ```
 - Cert + key are mounted into nginx at `/etc/nginx/certs/` (port 443 exposed).
-- Valid until **2028**; wildcards are **one level deep** (`a.82.test` ✓, `a.b.82.test` ✗).
+- Wildcards are **one level deep** (`a.82.test` works, `a.b.82.test` does not).
 
 **Manual step (needs sudo — run in a real Terminal), to trust the CA in browsers:**
 ```bash
@@ -252,64 +249,69 @@ Every `.test` vhost returns **301 → https** on port 80; the `localhost:PORT`
 fallbacks stay plain HTTP (no TLS on those ports by design).
 
 Verified:
-- `http://wagebook.82.test` → `301` → `https://wagebook.82.test` → `200`
+- `http://<proj>.82.test` → `301` → `https://<proj>.82.test` → `200`
 - `http://localhost:8082/info/` → stays `200` (plain HTTP)
 
 ---
 
-## 13. Running the wagebook Laravel project
+## 13. Example: running a Laravel project
 
-**Project:** `wagebook-hrm` (Laravel 9, requires PHP ^8.2), from Azure DevOps.
+Say you have a Laravel app to run on PHP 8.2. Call it `myapp`.
 
-### Steps performed
 ```bash
-# 1. Clone into the www folder (auth via Azure DevOps PAT)
+# 1. Put the code in the www folder
 cd ~/devstack/www
-git clone https://…/wagebook-hrm wagebook
+git clone <your-repo-url> myapp        # or copy the project in
 
-# 2. Install dependencies at PHP 8.2
-#    (had to disable Composer's advisory blocker for old dompdf/browsershot)
-docker compose exec -T -w /var/www/html/wagebook php82 sh -c \
-  'composer config policy.advisories.block false && composer install --no-interaction'
-#    then restored composer.json so git tree stayed clean
+# 2. Install dependencies at the right PHP version
+stack composer 8.2 myapp install
+#    Legacy project with old, advisory-flagged packages? Temporarily allow them:
+#      composer config policy.advisories.block false && composer install
+#    (revert composer.json afterwards to keep your tree clean)
 
-# 3. nginx vhost -> wagebook.82.test -> /public  (nginx/conf.d/wagebook.conf)
+# 3. Add an nginx vhost (copy the example template; .local.conf keeps it out of git)
+cp nginx/conf.d/laravel-example.conf.example nginx/conf.d/myapp.local.conf
+#    edit: server_name myapp.82.test; root .../myapp/public; fastcgi_pass php82:9000;
+stack restart
 
 # 4. Create the database
-stack mysql   ->   CREATE DATABASE wagebook; GRANT ALL ON wagebook.* TO 'app'@'%';
+stack mysql
+#    then: CREATE DATABASE myapp; GRANT ALL ON myapp.* TO 'app'@'%'; FLUSH PRIVILEGES;
 
-# 5. .env (local, gitignored) — key points:
-APP_URL=http://wagebook.82.test
-DB_HOST=mysql
-DB_DATABASE=wagebook
-DB_USERNAME=app
-DB_PASSWORD=app
-#    then: php artisan key:generate
+# 5. Configure .env (point Laravel at the shared MySQL)
+#      APP_URL=https://myapp.82.test
+#      DB_HOST=mysql
+#      DB_DATABASE=myapp
+#      DB_USERNAME=app
+#      DB_PASSWORD=app
+stack php 8.2 myapp artisan key:generate
 
-# 6. Import the full DB dump (NOT fresh migrations — see gotcha)
-docker exec -i devstack-mysql-1 mysql -uroot -proot wagebook \
-  < "~/Downloads/asl_employee_db_new_latest (26).sql"     # 126 tables
+# 6. Bring the schema up (fresh migrate OR import a dump)
+stack artisan 8.2 myapp migrate
+#    — or, if the project is normally seeded from a DB dump:
+#      docker exec -i devstack-mysql-1 mysql -uroot -proot myapp < dump.sql
 
-# 7. Create the storage dirs that are gitignored, make writable
-mkdir -p storage/framework/{sessions,views,cache/data} storage/logs storage/app/public bootstrap/cache
-chmod -R 777 storage bootstrap/cache
+# 7. Laravel storage dirs are gitignored — create + make writable after clone
+mkdir -p www/myapp/storage/framework/{sessions,views,cache/data} \
+         www/myapp/storage/logs www/myapp/bootstrap/cache
+chmod -R 777 www/myapp/storage www/myapp/bootstrap/cache
 
 # 8. Clear caches
-docker compose exec -T -w /var/www/html/wagebook php82 sh -c \
-  'php artisan config:clear; php artisan cache:clear; php artisan view:clear'
+stack php 8.2 myapp artisan config:clear
 ```
 
-✅ Result: `https://wagebook.82.test` → "Sign In - WageBook" (HTTP 200, PHP 8.2.32).
+Open **`https://myapp.82.test`**.
 
-### wagebook‑specific gotchas
-- **Do NOT run migrations from scratch** — the migration set is order‑broken
-  (foreign keys reference `users.emp_id` before it exists). Use a **DB dump**.
-- `AppServiceProvider::boot()` runs **DB queries on every request/command**
-  (PayrollSettings, EmployeeProvidentFunds, EmployeeDocuments) — nothing works
-  until the DB is populated.
-- Composer fails under the modern advisory blocker → `composer config
-  policy.advisories.block false`.
-- `storage/framework/*` subdirs are gitignored → recreate after clone.
+### Common real‑world gotchas
+- **Migrations that don't run from scratch** (e.g. foreign keys referencing
+  columns a later migration adds): the project is likely meant to be set up from
+  a **DB dump** rather than fresh migrations.
+- **Service providers that query the DB at boot**: nothing (not even `artisan`)
+  works until the database is populated. Import data first.
+- **Composer refuses old packages** flagged by security advisories:
+  `composer config policy.advisories.block false`.
+- **`storage/framework/*` missing after clone**: it's gitignored — recreate it.
+- **`git` isn't inside the PHP containers**: run git on the host.
 
 ---
 
@@ -320,10 +322,10 @@ stack up                 # morning: start the stack
 stack ps                 # what's running
 stack down               # end of day: stop (data persists)
 
-# wagebook
-open https://wagebook.82.test
-stack artisan 8.2 wagebook migrate:status
-stack composer 8.2 wagebook install
+# a project
+open https://myapp.82.test
+stack artisan 8.2 myapp migrate:status
+stack composer 8.2 myapp install
 
 # database
 open http://localhost:8888          # phpMyAdmin (root/root or app/app)
@@ -340,8 +342,8 @@ stack mysql                          # CLI
 
 **Laravel/Symfony project** (web root is `/public`):
 1. Put code in `~/devstack/www/<name>/`
-2. Copy `nginx/conf.d/wagebook.conf` → `<name>.conf`, change `server_name`,
-   `root .../public`, and `php82` → desired version
+2. `cp nginx/conf.d/laravel-example.conf.example nginx/conf.d/<name>.local.conf`, edit
+   `server_name`, `root .../public`, and `php82` → desired version
 3. `stack restart`
 4. `stack composer <ver> <name> install`, set up `.env` (`DB_HOST=mysql`),
    create/import the DB
@@ -363,27 +365,27 @@ HTTPS works automatically for any new `*.NN.test` host — no cert regeneration.
 | Laravel 500 `Failed to open stream: .../sessions` | `storage/framework/*` missing → `mkdir -p` + `chmod -R 777 storage bootstrap/cache` |
 | Laravel DB errors at boot | DB empty/not imported, or `.env` `DB_HOST` wrong (should be `mysql`) |
 | Composer refuses to install old packages | `composer config policy.advisories.block false` |
-| `git` not found inside container | Run git on the **host** (`cd ~/devstack/www/<proj> && git …`) |
+| `git` not found inside container | Run git on the **host** |
 
 ---
 
-## 17. Outstanding manual steps
+## 17. Manual (sudo) steps
 
-These require your admin password, so they must be run by you in a **real
-Terminal** (not the `!` prefix, which can't prompt for a password):
+These require your admin password, so run them in a **real Terminal** (not a
+non‑interactive shell):
 
-1. **Trust the HTTPS CA** (fixes "Not secure"):
+1. **dnsmasq activation** — see §10.
+2. **Trust the HTTPS CA** (fixes "Not secure"):
    ```bash
    mkcert -install
    ```
    then fully quit & reopen your browser.
 
-2. (Already done) dnsmasq activation — see §10, in case of a fresh setup.
-
-### Security reminder
-An Azure DevOps **Personal Access Token** was pasted into the chat during setup.
-**Rotate/revoke it** (Azure DevOps → avatar → Personal access tokens). Future
-clones/pulls will use the macOS Keychain after authenticating once in a terminal.
+### Credential hygiene
+When cloning private repos, authenticate once in your own terminal so the
+credential is stored in the macOS Keychain — don't hard‑code tokens into
+`.git/config` or commit them. `.env`, `nginx/certs/`, and `data/` are gitignored
+for this reason.
 
 ---
 
