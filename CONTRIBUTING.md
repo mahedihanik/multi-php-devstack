@@ -12,7 +12,7 @@ PHP versions at once for local dev on macOS.
 ## Good first issues / ideas
 - Add/adjust PHP versions (e.g. 8.3)
 - Linux (non-macOS) support notes
-- A `stack new <ver> <name>` scaffolder that creates the folder + vhost
+- Extend `stack new` (e.g. `--symfony`, or auto-create the database)
 - Optional services: Redis, Mailpit, Meilisearch
 - CI that builds every PHP image on a schedule
 

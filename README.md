@@ -86,6 +86,7 @@ To get the pretty `https://<name>.NN.test` URLs, do the two one-time steps in
 ## The `stack` command
 
 ```bash
+stack new <ver> <name> [laravel]     # scaffold a project folder + vhost
 stack up | down | restart | rebuild | ps | logs [service]
 stack php <ver> <project> ...        # e.g. stack php 8.2 myapp -v
 stack composer <ver> <project> ...   # e.g. stack composer 7.4 shop install
@@ -98,9 +99,14 @@ stack mysql                          # mysql client
 
 ## Add a project
 
-**Plain PHP:** drop it in `www/<name>/`, then open `https://<name>.82.test`.
+Fastest way — let the scaffolder create the folder and vhost for you:
+```bash
+stack new 8.2 myapp            # plain PHP project  -> https://myapp.82.test
+stack new 7.4 shop laravel     # Laravel (root = /public) on PHP 7.4
+```
+Then drop your code in `www/myapp/` and open the URL it prints.
 
-**Laravel/Symfony** (web root is `/public`):
+Prefer to do it by hand? Copy the template and edit it:
 ```bash
 cp nginx/conf.d/laravel-example.conf.example nginx/conf.d/myapp.local.conf
 # edit server_name + root + php version, then:
@@ -128,7 +134,7 @@ Record `stack up`, hitting several versions, and phpMyAdmin; export to
 ## Contributing
 
 Issues and PRs welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Ideas: more PHP
-versions, Linux support, a `stack new` project scaffolder, optional Redis/Mailpit.
+versions, Linux support, optional Redis/Mailpit services.
 
 ## License
 

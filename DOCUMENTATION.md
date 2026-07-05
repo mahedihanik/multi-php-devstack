@@ -166,6 +166,7 @@ Every version reports the correct `PHP x.y.z` and connects to `MySQL 8.0`
 `bin/stack`, symlinked to `/opt/homebrew/bin/stack` (on PATH):
 
 ```bash
+stack new <ver> <name> [laravel]   # scaffold a project folder + nginx vhost
 stack up                       # start everything
 stack down                     # stop
 stack restart                  # restart containers
@@ -336,11 +337,19 @@ stack mysql                          # CLI
 
 ## 15. Adding a new project
 
-**Plain PHP project:**
+**Fastest — use the scaffolder:**
+```bash
+stack new 8.2 <name>            # plain PHP project
+stack new 7.4 <name> laravel    # Laravel (web root = /public)
+```
+It creates `www/<name>/`, writes `nginx/conf.d/<name>.local.conf`, and reloads
+nginx. Then put your code in the folder and open the printed URL.
+
+**Manually — plain PHP project:**
 1. Put code in `~/devstack/www/<name>/`
 2. Open `https://<name>.82.test` (or any version), or `http://localhost:8082/<name>/`
 
-**Laravel/Symfony project** (web root is `/public`):
+**Manually — Laravel/Symfony project** (web root is `/public`):
 1. Put code in `~/devstack/www/<name>/`
 2. `cp nginx/conf.d/laravel-example.conf.example nginx/conf.d/<name>.local.conf`, edit
    `server_name`, `root .../public`, and `php82` → desired version
