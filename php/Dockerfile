@@ -18,6 +18,7 @@ RUN install-php-extensions \
       exif \
       pcntl \
       soap \
+      imagick \
       xdebug \
       @composer
 

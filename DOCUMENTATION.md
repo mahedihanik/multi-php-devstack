@@ -86,7 +86,7 @@ ARG PHP_VERSION=8.2
 FROM php:${PHP_VERSION}-fpm
 COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/local/bin/
 RUN install-php-extensions \
-      pdo_mysql mysqli gd zip intl bcmath mbstring opcache exif pcntl soap xdebug @composer
+      pdo_mysql mysqli gd zip intl bcmath mbstring opcache exif pcntl soap imagick xdebug @composer
 WORKDIR /var/www/html
 ```
 
